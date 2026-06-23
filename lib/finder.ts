@@ -168,6 +168,48 @@ export function extractOffers(citations: Citation[], query: string): Offer[] {
   return offers.sort((a, b) => a.rank - b.rank);
 }
 
+// Words that are never part of a product name (used when mining a name from article titles).
+const STOP_TITLE = new Set([
+  'best', 'the', 'review', 'reviews', 'reviewed', 'vs', 'versus', 'guide', 'guides', 'how', 'top',
+  'of', 'for', 'and', 'a', 'an', 'your', 'our', 'why', 'are', 'is', 'to', 'in', 'on', 'with', 'what',
+  'which', 'should', 'you', 'buy', 'price', 'prices', 'deals', 'deal', 'sale', 'new', 'this', 'that',
+  'my', 'it', 'its', 'worth', 'original', 'tested', 'best-selling', 'i', 'we',
+]);
+
+/**
+ * Mine the most likely product NAME from read article/result titles (for the
+ * "describe it" case where Caesar returns reviews, not buy pages). Counts
+ * capitalized brand+model bigrams across titles so varying suffixes ("Vibram
+ * FiveFingers KSO" vs "Vibram FiveFingers") still agree, then returns the
+ * shortest title phrase carrying the winning bigram.
+ */
+export function identifyProduct(citations: Citation[], _query: string): string | undefined {
+  const bigrams = new Map<string, number>();
+  const phrases: string[] = [];
+  for (const c of citations) {
+    if (!c.captureTime) continue;
+    const title = cleanTitle(c.title ?? '');
+    const caps = title.match(/\b[A-Z][A-Za-z0-9]+(?:[-\s][A-Z0-9][A-Za-z0-9-]*){0,3}\b/g) ?? [];
+    for (const p of caps) {
+      const toks = p.split(/\s+/).filter((t) => !STOP_TITLE.has(t.toLowerCase()));
+      if (toks.length) phrases.push(toks.join(' '));
+      for (let i = 0; i + 1 < toks.length; i++) {
+        const bg = `${toks[i]} ${toks[i + 1]}`.toLowerCase();
+        if (bg.replace(/[^a-z0-9]/g, '').length < 6) continue;
+        bigrams.set(bg, (bigrams.get(bg) ?? 0) + 1);
+      }
+    }
+  }
+  let top: string | undefined;
+  let topN = 0;
+  for (const [bg, n] of bigrams) {
+    if (n > topN) { topN = n; top = bg; }
+  }
+  if (!top || topN < 2) return undefined;
+  const matching = phrases.filter((p) => p.toLowerCase().startsWith(top!)).sort((a, b) => a.length - b.length);
+  return matching[0] ?? top.replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
 /**
  * Best guess at "what is this product" — the top offer's title, but only when
  * the results cohere around ONE product (so a vague query that returns three
@@ -202,9 +244,21 @@ export async function runFinder(
   if (process.env.VERIFIER_DEMO) return demoFinder(query);
   const client = deps.client ?? new CaesarClient();
   try {
-    const { citations } = await client.searchAndRead(query, { maxResults: 10, readTopN: 6 });
-    const offers = extractOffers(citations, query);
-    return { query, topMatch: topMatch(offers), offers, degraded: false };
+    const first = await client.searchAndRead(query, { maxResults: 10, readTopN: 6 });
+    const offers1 = extractOffers(first.citations, query);
+    // Named product: the query already surfaced retailers — done in one search.
+    if (offers1.length >= 2) {
+      return { query, topMatch: topMatch(offers1), offers: offers1, degraded: false };
+    }
+    // Description (or thin result): identify the product, then search retailers for it.
+    const product = topMatch(offers1) ?? identifyProduct(first.citations, query);
+    if (product) {
+      const second = await client.searchAndRead(product, { maxResults: 10, readTopN: 6 });
+      const offers2 = extractOffers(second.citations, product);
+      if (offers2.length > 0) return { query, topMatch: product, offers: offers2, degraded: false };
+      return { query, topMatch: product, offers: offers1, degraded: false };
+    }
+    return { query, topMatch: topMatch(offers1), offers: offers1, degraded: false };
   } catch {
     return demoFinder(query);
   }

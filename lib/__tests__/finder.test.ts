@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { parsePrice, retailerName, cleanTitle, extractOffers, topMatch, runFinder } from '../finder';
+import { parsePrice, retailerName, cleanTitle, extractOffers, topMatch, identifyProduct, runFinder } from '../finder';
 import type { Offer } from '../finder';
 import { CaesarClient } from '../caesar';
 import type { Citation } from '../caesar';
@@ -134,16 +134,47 @@ describe('topMatch', () => {
   });
 });
 
+const articleCites: Citation[] = [
+  { rank: 1, title: 'Vibram FiveFingers KSO: The Original Toe Shoe, Reviewed', canonicalUrl: 'https://www.outdoorgearlab.com/reviews/vibram', docId: 'a1', captureTime: 't', text: 'The Vibram FiveFingers KSO is the classic toe shoe with individual toe pockets.' },
+  { rank: 2, title: 'Are Vibram FiveFingers Worth It? A Runner Weighs In', canonicalUrl: 'https://www.runnersworld.com/gear/vibram', docId: 'a2', captureTime: 't', text: 'Vibram FiveFingers have separate slots for each toe.' },
+  { rank: 3, title: 'The 8 Best Barefoot Running Shoes of 2026', canonicalUrl: 'https://www.runnersworld.com/best-barefoot', docId: 'a3', captureTime: 't', text: 'A roundup of barefoot shoes.' },
+];
+
+describe('identifyProduct', () => {
+  it('extracts the repeated brand+model from article titles', () => {
+    expect(identifyProduct(articleCites, 'running shoes with individual toe slots')).toContain('Vibram FiveFingers');
+  });
+  it('is undefined when no product name repeats', () => {
+    expect(identifyProduct([{ rank: 1, title: 'asdf gibberish nonsense', canonicalUrl: 'https://en.wikipedia.org/x', docId: 'd', captureTime: 't', text: 'no product' }], 'asdfgh')).toBeUndefined();
+  });
+});
+
 describe('runFinder', () => {
   function fakeClient(over: Partial<CaesarClient>): CaesarClient {
     return Object.assign(Object.create(CaesarClient.prototype), over) as CaesarClient;
   }
-  it('returns offers from Caesar (not degraded) with a top match', async () => {
-    const client = fakeClient({ searchAndRead: vi.fn().mockResolvedValue({ evidence: 'x', citations: productCites }) });
-    const out = await runFinder('sony wh-1000xm5', { client });
+  it('returns offers from Caesar (not degraded) with a top match, in ONE search for a named product', async () => {
+    const searchAndRead = vi.fn().mockResolvedValue({ evidence: 'x', citations: productCites });
+    const out = await runFinder('sony wh-1000xm5', { client: fakeClient({ searchAndRead }) });
     expect(out.degraded).toBe(false);
     expect(out.offers[0].retailer).toBe('Amazon');
     expect(out.topMatch).toContain('Sony');
+    expect(searchAndRead).toHaveBeenCalledTimes(1); // named product: no second search needed
+  });
+
+  it('two-stage: identifies the product from a description, then searches retailers for it', async () => {
+    const retailerCites: Citation[] = [
+      { rank: 1, title: 'Vibram FiveFingers KSO - Amazon.com', canonicalUrl: 'https://www.amazon.com/dp/v', docId: 'r1', captureTime: 't', text: 'Add to cart. In stock.' },
+      { rank: 2, title: 'Vibram FiveFingers | REI Co-op', canonicalUrl: 'https://www.rei.com/product/vibram', docId: 'r2', captureTime: 't', text: 'In stock, add to cart.' },
+    ];
+    const searchAndRead = vi.fn()
+      .mockResolvedValueOnce({ evidence: 'x', citations: articleCites })   // stage 1: articles, no buy pages
+      .mockResolvedValueOnce({ evidence: 'x', citations: retailerCites }); // stage 2: retailers
+    const out = await runFinder('running shoes with individual toe slots', { client: fakeClient({ searchAndRead }) });
+    expect(searchAndRead).toHaveBeenCalledTimes(2);
+    expect(out.topMatch).toContain('Vibram FiveFingers');
+    expect(out.offers.map((o) => o.retailer)).toEqual(['Amazon', 'REI']);
+    expect(out.degraded).toBe(false);
   });
   it('degrades to a demo result only when Caesar THROWS', async () => {
     const client = fakeClient({ searchAndRead: vi.fn().mockRejectedValue(new Error('429')) });
