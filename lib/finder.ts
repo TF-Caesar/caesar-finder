@@ -157,7 +157,12 @@ export function topMatch(offers: Offer[]): string | undefined {
   if (!offers.length) return undefined;
   const top = offers[0].productTitle;
   if (offers.length === 1) return top;
-  const identity = (top.toLowerCase().match(/[a-z0-9][a-z0-9-]{2,}/g) ?? []).sort((a, b) => b.length - a.length)[0];
+  const tokens = top.toLowerCase().match(/[a-z0-9][a-z0-9-]{2,}/g) ?? [];
+  // Prefer a model-number token (contains a digit, e.g. "wh-1000xm5") as the
+  // identity — generic descriptors ("cancellation") vary across retailers and
+  // would wrongly break coherence for the same product.
+  const withDigit = tokens.filter((t) => /\d/.test(t));
+  const identity = (withDigit.length ? withDigit : tokens).sort((a, b) => b.length - a.length)[0];
   if (!identity) return top;
   const agree = offers.filter((o) => o.productTitle.toLowerCase().includes(identity)).length;
   return agree / offers.length >= 0.5 ? top : undefined;

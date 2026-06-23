@@ -1,6 +1,6 @@
 # Caesar Finder
 
-Name a product, or **describe the one you're picturing**. Caesar searches the live web, reads the listings, and shows you **what it is and where to buy it** — with the captured price and **the moment that page was captured**, not a model's memory.
+Name a product, or **describe the one you're picturing**. Caesar searches the live web, reads the listings, and shows you **what it is and where to buy it** — each with **the moment that page was captured** (and the price, when the page lists one), not a model's memory.
 
 Free. No signup. No API key. Powered by [Caesar](https://trycaesar.com) search.
 

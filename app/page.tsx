@@ -26,8 +26,8 @@ export default function Home() {
 
         <p className="mt-4 max-w-[44ch] text-[1.0625rem] leading-relaxed text-ink-2">
           Name it, or just describe the one you&rsquo;re picturing. Caesar reads the live
-          listings and shows what it is and where it&rsquo;s sold — with the captured price and
-          the moment it was captured. Free, no signup — powered by{' '}
+          listings and shows what it is and where it&rsquo;s sold — each with the moment it was
+          captured, and the price when the page lists one. Free, no signup — powered by{' '}
           <a
             href="https://trycaesar.com"
             target="_blank"

@@ -95,6 +95,14 @@ describe('topMatch', () => {
   it('returns the top product title when the offers cohere around one product', () => {
     expect(topMatch(extractOffers(productCites, 'sony'))).toBe('Sony WH-1000XM5 Wireless Headphones');
   });
+  it('coheres on the model number even when descriptors vary (canceling vs cancellation)', () => {
+    const offers: Offer[] = [
+      { productTitle: 'Sony WH-1000XM5 Wireless Headphones with Active Noise Cancellation', retailer: 'Headphones', url: 'https://headphones.com/a', rank: 1, captureTime: 't' },
+      { productTitle: 'Sony WH-1000XM5 Wireless Industry Leading Noise Canceling Headphones', retailer: 'Amazon', url: 'https://amazon.com/b', rank: 2, captureTime: 't' },
+      { productTitle: 'Sony Black Over-Ear WH-1000XM5 Wireless Noise Canceling', retailer: 'Abt', url: 'https://abt.com/c', rank: 3, captureTime: 't' },
+    ];
+    expect(topMatch(offers)).toContain('WH-1000XM5');
+  });
   it('is undefined when the offers are clearly different products', () => {
     const diverse: Offer[] = [
       { productTitle: 'Sony WF-1000XM4 Earbuds', retailer: 'Amazon', url: 'https://amazon.com/a', rank: 1, captureTime: 't' },
