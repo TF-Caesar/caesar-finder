@@ -63,11 +63,13 @@ const productCites: Citation[] = [
 ];
 
 describe('extractOffers', () => {
-  it('builds offers only from READ pages with a buy signal, parsing the item price', () => {
+  it('builds offers only from READ pages with a buy signal; price is never surfaced from a capture', () => {
     const offers = extractOffers(productCites, 'sony wh-1000xm5');
     expect(offers).toHaveLength(2); // unread d2 dropped
-    expect(offers[0]).toMatchObject({ retailer: 'Amazon', price: '$398.00' });
-    expect(offers[1]).toMatchObject({ retailer: 'Best Buy', price: '$349.99' });
+    expect(offers[0]).toMatchObject({ retailer: 'Amazon' });
+    expect(offers[1]).toMatchObject({ retailer: 'Best Buy' });
+    // a currency token gates the page in but is too unreliable to display as the price
+    expect(offers.every((o) => o.price === undefined)).toBe(true);
   });
   it('drops review roundups / pages with no buy signal', () => {
     const mixed: Citation[] = [

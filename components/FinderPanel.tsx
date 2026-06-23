@@ -89,8 +89,7 @@ export function FinderPanel() {
             </div>
           ))}
           <p className="pt-2 text-[12px] text-ink-2">
-            Each result is a live listing Caesar read and captured. A price is shown only when the
-            captured page states one plainly — otherwise click through for price and availability.
+            Each result is a live listing Caesar read and captured — click through for price and availability.
           </p>
         </div>
       )}

@@ -130,16 +130,21 @@ export function extractOffers(citations: Citation[], query: string): Offer[] {
     const retailer = retailerName(c.canonicalUrl);
     if (seen.has(retailer)) continue;
     const body = c.text && c.text.length > 0 ? c.text : (c.passage ?? '');
-    const price = parsePrice(body);
-    const looksProduct = Boolean(price) || PRODUCT_PATH.test(u.pathname) || BUY_TEXT.test(body);
-    const looksRoundup = ROUNDUP_TITLE.test(c.title ?? '') && !price && !PRODUCT_PATH.test(u.pathname);
+    // A currency token is a useful *buy signal* (this is a product/listing page),
+    // but on a web-search capture it's unreliably the PRODUCT's price (payment
+    // plans, accessories, "frequently bought together" all surface) — so we use
+    // it to gate, never to display. Showing a wrong price would break the whole
+    // portfolio's "receipts, not a model's memory" premise.
+    const priceSignal = parsePrice(body);
+    const looksProduct = Boolean(priceSignal) || PRODUCT_PATH.test(u.pathname) || BUY_TEXT.test(body);
+    const looksRoundup = ROUNDUP_TITLE.test(c.title ?? '') && !priceSignal && !PRODUCT_PATH.test(u.pathname);
     if (!looksProduct || looksRoundup) continue; // require a real buy signal
     seen.add(retailer);
     offers.push({
       productTitle: cleanTitle(c.title || retailer),
       retailer,
       url: c.canonicalUrl,
-      price,
+      price: undefined,
       snippet: bestSnippet(body, query),
       captureTime: c.captureTime,
       rank: c.rank,
