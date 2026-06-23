@@ -244,7 +244,7 @@ export async function runFinder(
   if (process.env.VERIFIER_DEMO) return demoFinder(query);
   const client = deps.client ?? new CaesarClient();
   try {
-    const first = await client.searchAndRead(query, { maxResults: 10, readTopN: 6 });
+    const first = await client.searchAndRead(query, { maxResults: 10, readTopN: 6, minScore: 0.3 });
     const offers1 = extractOffers(first.citations, query);
     // Named product: the query already surfaced retailers — done in one search.
     if (offers1.length >= 2) {
@@ -253,7 +253,7 @@ export async function runFinder(
     // Description (or thin result): identify the product, then search retailers for it.
     const product = topMatch(offers1) ?? identifyProduct(first.citations, query);
     if (product) {
-      const second = await client.searchAndRead(product, { maxResults: 10, readTopN: 6 });
+      const second = await client.searchAndRead(product, { maxResults: 10, readTopN: 6, minScore: 0.3 });
       const offers2 = extractOffers(second.citations, product);
       if (offers2.length > 0) return { query, topMatch: product, offers: offers2, degraded: false };
       return { query, topMatch: product, offers: offers1, degraded: false };

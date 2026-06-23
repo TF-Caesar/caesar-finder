@@ -34,7 +34,7 @@ describe('CaesarClient.read', () => {
       passages: [{ passage_id: 'p1', text: 'a passage' }],
       provenance: { capture_id: 'cap1', capture_time: '2026-06-21T14:03:00Z' },
     });
-    const d = await new CaesarClient().read('https://x.com/a', { selection: 'query_relevant', query: 'q' });
+    const d = await new CaesarClient().read('https://x.com/a', { query: 'q' });
     expect(d.text).toBe('full text');
     expect(d.passages[0]).toEqual({ passageId: 'p1', text: 'a passage' });
     expect(d.captureTime).toBe('2026-06-21T14:03:00Z');
