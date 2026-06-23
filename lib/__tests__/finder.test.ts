@@ -84,6 +84,22 @@ describe('extractOffers', () => {
     expect(offers).toHaveLength(1);
     expect(offers[0].retailer).toBe('Amazon');
   });
+  it('drops review/news/forum sites that are never where-to-buy', () => {
+    const cites: Citation[] = [
+      productCites[0], // Amazon — kept
+      { rank: 2, title: 'The Dyson V15 Detect Impresses in Consumer Reports', canonicalUrl: 'https://www.consumerreports.org/vacuums/dyson-v15', docId: 'cr', captureTime: 't', text: 'We tested it; it sells for about $749 at retailers.' },
+      { rank: 3, title: 'Best vacuum? — r/vacuums', canonicalUrl: 'https://www.reddit.com/r/vacuums/comments/x', docId: 'rd', captureTime: 't', text: 'I paid $600 for mine' },
+    ];
+    const offers = extractOffers(cites, 'dyson v15');
+    expect(offers).toHaveLength(1);
+    expect(offers[0].retailer).toBe('Amazon');
+  });
+  it('strips the retailer name from the product title', () => {
+    const cites: Citation[] = [
+      { rank: 1, title: "Dyson V15 Detect Absolute Cordless Vacuum - Macy's", canonicalUrl: 'https://www.macys.com/shop/product/dyson-v15', docId: 'm', captureTime: 't', text: 'Add to bag. In stock.' },
+    ];
+    expect(extractOffers(cites, 'dyson v15')[0].productTitle).toBe('Dyson V15 Detect Absolute Cordless Vacuum');
+  });
   it('dedups by retailer identity, including subdomains', () => {
     const dup: Citation[] = [
       ...productCites,

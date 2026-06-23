@@ -82,6 +82,12 @@ export function cleanTitle(title: string): string {
     .trim();
 }
 
+/** Remove a trailing " <sep> <retailer>" we already know (handles names like "Macy's" the generic strip misses). */
+function stripRetailerSuffix(title: string, retailer: string): string {
+  const esc = retailer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return title.replace(new RegExp(`\\s*[-|:–·]\\s*${esc}(?:\\.[a-z]{2,3})?\\s*$`, 'i'), '').trim();
+}
+
 /** The single most query-relevant sentence (a "what it is" line), cleaned for display. */
 export function bestSnippet(text: string, query: string, maxLen = 160): string | undefined {
   if (!text) return undefined;
@@ -109,6 +115,13 @@ const PRODUCT_PATH = /\/(dp|gp\/product|p|ip|itm|product|products|pd|sku|buy)\//
 const BUY_TEXT = /add to (?:cart|bag|basket)|buy now|in stock|out of stock|add-to-cart/i;
 // Titles that signal a review/roundup/comparison rather than a single product listing.
 const ROUNDUP_TITLE = /\b(\d+\s+)?best\b|\breview(s)?\b|\bvs\.?\b|\bversus\b|\bbuying guide\b|\bguide\b|\bhow to\b|\bround[- ]?up\b|\bcompared\b/i;
+// Domains that are never "where to buy" — review, news, forum, and content sites.
+const NON_RETAIL = new Set([
+  'consumerreports', 'wirecutter', 'nytimes', 'rtings', 'cnet', 'techradar', 'tomsguide', 'theverge',
+  'reddit', 'youtube', 'wikipedia', 'pcmag', 'engadget', 'forbes', 'businessinsider', 'buzzfeed',
+  'medium', 'quora', 'gizmodo', 'wired', 'digitaltrends', 'soundguys', 'whathifi', 'trustedreviews',
+  'tripadvisor', 'yelp', 'pinterest', 'facebook', 'instagram', 'tiktok',
+]);
 
 /**
  * Build product offers from search+read citations. Only pages actually READ
@@ -127,7 +140,9 @@ export function extractOffers(citations: Citation[], query: string): Offer[] {
     } catch {
       continue;
     }
-    const retailer = retailerName(c.canonicalUrl);
+    const reg = registrableLabel(u.hostname);
+    if (NON_RETAIL.has(reg)) continue; // review/news/forum sites are never where-to-buy
+    const retailer = RETAILERS[reg] ?? (reg.charAt(0).toUpperCase() + reg.slice(1));
     if (seen.has(retailer)) continue;
     const body = c.text && c.text.length > 0 ? c.text : (c.passage ?? '');
     // A currency token is a useful *buy signal* (this is a product/listing page),
@@ -141,7 +156,7 @@ export function extractOffers(citations: Citation[], query: string): Offer[] {
     if (!looksProduct || looksRoundup) continue; // require a real buy signal
     seen.add(retailer);
     offers.push({
-      productTitle: cleanTitle(c.title || retailer),
+      productTitle: stripRetailerSuffix(cleanTitle(c.title || retailer), retailer),
       retailer,
       url: c.canonicalUrl,
       price: undefined,
