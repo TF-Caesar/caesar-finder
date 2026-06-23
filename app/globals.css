@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Confirmed Caesar neutrals */
+  --paper:    #FFFFFC;
+  --ink:      #333230;
+  --ink-mark: #262524;
+  --bone:     #E5E2DB;
+
+  /* Warm neutrals harmonized with the anchors above */
+  --canvas:   #F2F0E9;
+  --surface:  #F7F7F0;
+  --hairline: #DBD7CC;
+  --ink-2:    #615D59;
+
+  /* Editorial accents — the only saturated color on the page */
+  --sage:      #5F7C5F;
+  --sage-tint: #EBEFE8;
+  --sage-deep: #46603F;
+
+  --coral:      #F97554;
+  --coral-tint: #FCEAE2;
+  --coral-deep: #B14B30;
+
+  --clay:      #7A6F66;
+  --clay-tint: #EFEBE4;
+  --clay-deep: #54493F;
+
+  --radius-card: 16px;
+  --radius-input: 18px;
+  --radius-pill: 9999px;
+
+  --ease: cubic-bezier(0.44, 0, 0.56, 1);
+
+  /* All-Geist; variables wired by next/font in layout.tsx */
+  --font-display: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-body:    var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; text-rendering: optimizeLegibility; }
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.025em;
+    line-height: 1.07;
+    color: var(--ink-mark);
+    text-wrap: balance;
+  }
+  ::placeholder { color: var(--ink-2); opacity: 1; }
+  ::selection { background: var(--sage-tint); color: var(--ink-mark); }
+  a { color: inherit; text-decoration: none; }
+  :focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; border-radius: 6px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+}
+
+@layer utilities {
+  @keyframes cv-rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .cv-rise { animation: cv-rise 0.4s var(--ease) both; }
+}
