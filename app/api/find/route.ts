@@ -11,9 +11,19 @@ export async function POST(req: Request) {
   if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) {
     return NextResponse.json(EMPTY, { status: 413 });
   }
+  // Also cap the actual body — chunked / missing Content-Length bypasses the header check.
+  let raw = '';
+  try {
+    raw = await req.text();
+  } catch {
+    raw = '';
+  }
+  if (raw.length > MAX_BODY_BYTES) {
+    return NextResponse.json(EMPTY, { status: 413 });
+  }
   let query = '';
   try {
-    query = (await req.json())?.query ?? '';
+    query = JSON.parse(raw)?.query ?? '';
   } catch {
     query = '';
   }

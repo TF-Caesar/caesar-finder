@@ -271,9 +271,9 @@ function demoFinder(query: string): FinderResult {
     topMatch: 'Sony WH-1000XM5 Wireless Headphones',
     degraded: true,
     offers: [
-      { productTitle: 'Sony WH-1000XM5 Wireless Noise-Cancelling Headphones', retailer: 'Amazon', url: 'https://www.amazon.com/dp/B09XS7JWHH', price: '$398.00', snippet: 'Industry-leading noise cancellation with two processors controlling eight microphones.', captureTime: '2026-06-22T09:41:00Z', rank: 1 },
-      { productTitle: 'Sony WH-1000XM5 Headphones', retailer: 'Best Buy', url: 'https://www.bestbuy.com/site/sony-wh1000xm5', price: '$349.99', snippet: 'Crystal clear hands-free calling with precise voice pickup technology.', captureTime: '2026-06-22T09:38:00Z', rank: 2 },
-      { productTitle: 'Sony WH-1000XM5', retailer: 'Target', url: 'https://www.target.com/p/sony-wh-1000xm5', price: '$379.99', snippet: 'Up to 30-hour battery life with quick charging (3 min charge for 3 hours).', captureTime: '2026-06-22T09:30:00Z', rank: 3 },
+      { productTitle: 'Sony WH-1000XM5 Wireless Noise-Cancelling Headphones', retailer: 'Amazon', url: 'https://www.amazon.com/dp/B09XS7JWHH', snippet: 'Industry-leading noise cancellation with two processors controlling eight microphones.', captureTime: '2026-06-22T09:41:00Z', rank: 1 },
+      { productTitle: 'Sony WH-1000XM5 Headphones', retailer: 'Best Buy', url: 'https://www.bestbuy.com/site/sony-wh1000xm5', snippet: 'Crystal clear hands-free calling with precise voice pickup technology.', captureTime: '2026-06-22T09:38:00Z', rank: 2 },
+      { productTitle: 'Sony WH-1000XM5', retailer: 'Target', url: 'https://www.target.com/p/sony-wh-1000xm5', snippet: 'Up to 30-hour battery life with quick charging (3 min charge for 3 hours).', captureTime: '2026-06-22T09:30:00Z', rank: 3 },
     ],
   };
 }

@@ -27,7 +27,7 @@ export default function Home() {
         <p className="mt-4 max-w-[44ch] text-[1.0625rem] leading-relaxed text-ink-2">
           Name it, or just describe the one you&rsquo;re picturing. Caesar reads the live
           listings and shows what it is and where it&rsquo;s sold — each with the moment it was
-          captured, and the price when the page lists one. Free, no signup — powered by{' '}
+          captured. Free, no signup — powered by{' '}
           <a
             href="https://trycaesar.com"
             target="_blank"
@@ -55,7 +55,7 @@ export default function Home() {
           >
             Caesar search
           </a>{' '}
-          — free, no signup. Prices are a point-in-time capture, not a live quote.
+          — free, no signup. Every result is a live page Caesar read and captured, with a timestamp.
         </p>
       </footer>
     </main>

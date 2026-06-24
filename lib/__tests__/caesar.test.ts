@@ -62,4 +62,22 @@ describe('CaesarClient.searchAndRead', () => {
     expect(r.citations[0].canonicalUrl).toBe('https://x.com/1');
     expect(r.citations[0].passage).toBeUndefined();
   });
+
+  it('minScore drops null/missing-score and low-score results, keeps scored ones', async () => {
+    searchMock.mockResolvedValue({ search_id: 's1', results: [
+      { rank: 1, title: 'good', canonical_url: 'https://a.com', doc_id: 'd1', snippet: 's', score: { value: 0.9 } },
+      { rank: 2, title: 'unscored (gibberish)', canonical_url: 'https://b.com', doc_id: 'd2', snippet: 's' },
+      { rank: 3, title: 'weak', canonical_url: 'https://c.com', doc_id: 'd3', snippet: 's', score: { value: 0.1 } },
+    ] });
+    readMock.mockResolvedValue({ doc: { doc_id: 'd1', canonical_url: 'https://a.com' }, content: { text: 'body' }, passages: [], provenance: { capture_id: 'c', capture_time: 't' } });
+    const r = await new CaesarClient().searchAndRead('q', { readTopN: 5, minScore: 0.3 });
+    expect(r.citations.map((c) => c.canonicalUrl)).toEqual(['https://a.com']);
+  });
+
+  it('keeps all results (including unscored) when no minScore is set', async () => {
+    searchMock.mockResolvedValue({ results: [{ rank: 1, title: 'x', canonical_url: 'https://a.com', doc_id: 'd1', snippet: 's' }] });
+    readMock.mockResolvedValue({ content: { text: '' }, passages: [] });
+    const r = await new CaesarClient().searchAndRead('q', { readTopN: 5 });
+    expect(r.citations).toHaveLength(1);
+  });
 });
