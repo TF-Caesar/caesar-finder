@@ -89,6 +89,8 @@ describe('extractOffers', () => {
       productCites[0], // Amazon — kept
       { rank: 2, title: 'The Dyson V15 Detect Impresses in Consumer Reports', canonicalUrl: 'https://www.consumerreports.org/vacuums/dyson-v15', docId: 'cr', captureTime: 't', text: 'We tested it; it sells for about $749 at retailers.' },
       { rank: 3, title: 'Best vacuum? — r/vacuums', canonicalUrl: 'https://www.reddit.com/r/vacuums/comments/x', docId: 'rd', captureTime: 't', text: 'I paid $600 for mine' },
+      // a reference/dictionary page with a stray price token must not become an offer
+      { rank: 4, title: 'asdfghjkl', canonicalUrl: 'https://www.urbandictionary.com/define.php?term=asdfghjkl', docId: 'ud', captureTime: 't', text: 'keyboard mash, buy now for $5' },
     ];
     const offers = extractOffers(cites, 'dyson v15');
     expect(offers).toHaveLength(1);

@@ -121,6 +121,9 @@ const NON_RETAIL = new Set([
   'reddit', 'youtube', 'wikipedia', 'pcmag', 'engadget', 'forbes', 'businessinsider', 'buzzfeed',
   'medium', 'quora', 'gizmodo', 'wired', 'digitaltrends', 'soundguys', 'whathifi', 'trustedreviews',
   'tripadvisor', 'yelp', 'pinterest', 'facebook', 'instagram', 'tiktok',
+  // reference / dictionary / how-to — never where-to-buy (catches gibberish that maps to a definition)
+  'urbandictionary', 'wiktionary', 'dictionary', 'merriamwebster', 'merriam-webster', 'britannica',
+  'wikihow', 'thesaurus', 'wikidata', 'fandom',
 ]);
 
 /**
@@ -244,7 +247,9 @@ export async function runFinder(
   if (process.env.VERIFIER_DEMO) return demoFinder(query);
   const client = deps.client ?? new CaesarClient();
   try {
-    const first = await client.searchAndRead(query, { maxResults: 10, readTopN: 6, minScore: 0.3 });
+    // No minScore here: the buy-page gate below is the real junk filter, and a
+    // score floor can wrongly empty results when Caesar omits scores under load.
+    const first = await client.searchAndRead(query, { maxResults: 10, readTopN: 6 });
     const offers1 = extractOffers(first.citations, query);
     // Named product: the query already surfaced retailers — done in one search.
     if (offers1.length >= 2) {
@@ -253,7 +258,7 @@ export async function runFinder(
     // Description (or thin result): identify the product, then search retailers for it.
     const product = topMatch(offers1) ?? identifyProduct(first.citations, query);
     if (product) {
-      const second = await client.searchAndRead(product, { maxResults: 10, readTopN: 6, minScore: 0.3 });
+      const second = await client.searchAndRead(product, { maxResults: 10, readTopN: 6 });
       const offers2 = extractOffers(second.citations, product);
       if (offers2.length > 0) return { query, topMatch: product, offers: offers2, degraded: false };
       return { query, topMatch: product, offers: offers1, degraded: false };
