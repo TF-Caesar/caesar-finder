@@ -26,7 +26,12 @@ const RETAILERS: Record<string, string> = {
   apple: 'Apple', sony: 'Sony', samsung: 'Samsung', ikea: 'IKEA', sephora: 'Sephora', chewy: 'Chewy',
 };
 
-const TLDS = new Set(['com', 'net', 'org', 'io', 'co', 'uk', 'us', 'ca', 'de', 'fr', 'shop', 'store', 'app']);
+const TLDS = new Set([
+  'com', 'net', 'org', 'io', 'co', 'shop', 'store', 'app',
+  // common ccTLDs, so amazon.in / amazon.it / bol.nl resolve to the brand label
+  'uk', 'us', 'ca', 'de', 'fr', 'au', 'jp', 'in', 'nz', 'it', 'es', 'nl', 'br', 'mx',
+  'kr', 'se', 'no', 'dk', 'fi', 'pl', 'ch', 'at', 'be', 'ie', 'pt', 'gr', 'cz', 'sg', 'hk', 'tw',
+]);
 
 // --- price parsing -------------------------------------------------------
 
@@ -239,12 +244,17 @@ export function topMatch(offers: Offer[]): string | undefined {
  * VERIFIER_DEMO) fall back to the baked demo; a search that simply found no
  * buyable product returns an honest empty result (degraded:false).
  */
+/** Demo mode is opt-IN: only explicit truthy strings count, so VERIFIER_DEMO=0 turns it OFF. */
+function demoModeOn(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes((process.env.VERIFIER_DEMO ?? '').trim().toLowerCase());
+}
+
 export async function runFinder(
   input: string,
   deps: { client?: CaesarClient } = {},
 ): Promise<FinderResult> {
   const query = input.trim();
-  if (process.env.VERIFIER_DEMO) return demoFinder(query);
+  if (demoModeOn()) return demoFinder(query);
   const client = deps.client ?? new CaesarClient();
   try {
     // No minScore here: the buy-page gate below is the real junk filter, and a
@@ -258,9 +268,13 @@ export async function runFinder(
     // Description (or thin result): identify the product, then search retailers for it.
     const product = topMatch(offers1) ?? identifyProduct(first.citations, query);
     if (product) {
-      const second = await client.searchAndRead(product, { maxResults: 10, readTopN: 6 });
-      const offers2 = extractOffers(second.citations, product);
-      if (offers2.length > 0) return { query, topMatch: product, offers: offers2, degraded: false };
+      // Stage 2 failing (rate limit, timeout) must not throw away stage 1's real
+      // offers in favor of the baked demo — degrade to what we already have.
+      try {
+        const second = await client.searchAndRead(product, { maxResults: 10, readTopN: 6 });
+        const offers2 = extractOffers(second.citations, product);
+        if (offers2.length > 0) return { query, topMatch: product, offers: offers2, degraded: false };
+      } catch { /* fall through to stage-1 offers */ }
       return { query, topMatch: product, offers: offers1, degraded: false };
     }
     return { query, topMatch: topMatch(offers1), offers: offers1, degraded: false };
@@ -271,14 +285,18 @@ export async function runFinder(
 
 /** Shown when the free tier is busy (and in VERIFIER_DEMO mode). */
 function demoFinder(query: string): FinderResult {
+  // Demo capture times are relative so the fallback never displays months-old
+  // "freshness" — the offers are canned; pretending they were captured long ago
+  // (or lying that they're live) would both be worse.
+  const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
   return {
     query: query || 'noise-cancelling headphones for long flights',
     topMatch: 'Sony WH-1000XM5 Wireless Headphones',
     degraded: true,
     offers: [
-      { productTitle: 'Sony WH-1000XM5 Wireless Noise-Cancelling Headphones', retailer: 'Amazon', url: 'https://www.amazon.com/dp/B09XS7JWHH', snippet: 'Industry-leading noise cancellation with two processors controlling eight microphones.', captureTime: '2026-06-22T09:41:00Z', rank: 1 },
-      { productTitle: 'Sony WH-1000XM5 Headphones', retailer: 'Best Buy', url: 'https://www.bestbuy.com/site/sony-wh1000xm5', snippet: 'Crystal clear hands-free calling with precise voice pickup technology.', captureTime: '2026-06-22T09:38:00Z', rank: 2 },
-      { productTitle: 'Sony WH-1000XM5', retailer: 'Target', url: 'https://www.target.com/p/sony-wh-1000xm5', snippet: 'Up to 30-hour battery life with quick charging (3 min charge for 3 hours).', captureTime: '2026-06-22T09:30:00Z', rank: 3 },
+      { productTitle: 'Sony WH-1000XM5 Wireless Noise-Cancelling Headphones', retailer: 'Amazon', url: 'https://www.amazon.com/dp/B09XS7JWHH', snippet: 'Industry-leading noise cancellation with two processors controlling eight microphones.', captureTime: minutesAgo(19), rank: 1 },
+      { productTitle: 'Sony WH-1000XM5 Headphones', retailer: 'Best Buy', url: 'https://www.bestbuy.com/site/sony-wh1000xm5', snippet: 'Crystal clear hands-free calling with precise voice pickup technology.', captureTime: minutesAgo(22), rank: 2 },
+      { productTitle: 'Sony WH-1000XM5', retailer: 'Target', url: 'https://www.target.com/p/sony-wh-1000xm5', snippet: 'Up to 30-hour battery life with quick charging (3 min charge for 3 hours).', captureTime: minutesAgo(30), rank: 3 },
     ],
   };
 }

@@ -17,7 +17,11 @@ function isPrivateHost(hostname: string): boolean {
     if (a === 192 && b === 168) return true;                // private
     if (a === 100 && b >= 64 && b <= 127) return true;       // CGNAT
   }
-  if (/^(fc|fd|fe80|::)/.test(h)) return true;              // IPv6 ULA / link-local / unspecified
+  // IPv6 literals only reach here bracketed ([::1] etc., brackets stripped above),
+  // so gate on ':' — a bare prefix test wrongly blocked real domains like fcc.gov.
+  // We treat EVERY IPv6 literal as non-public: nobody pastes a public site as an
+  // IPv6 literal, and mapped/ULA/link-local encodings are too varied to allowlist.
+  if (h.includes(':')) return true;
   return false;
 }
 
