@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FinderResult } from '../lib/finder';
 import { ProductCard } from './ProductCard';
 
@@ -10,24 +10,52 @@ const EXAMPLES = [
   'the gadget that tells you when fruit is ripe',
 ];
 
+function messageForStatus(status: number): string {
+  if (status === 429) return 'The free tier allows a few searches per minute. Wait a moment, then try again.';
+  if (status === 413) return 'That query is too large. Try a short product name or description.';
+  if (status === 400) return "That didn't look like a searchable query. Try a product name or a short description.";
+  return 'Something went wrong on our end. Try again in a moment.';
+}
+
 export function FinderPanel() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<FinderResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // Monotonic request id: a response only lands if it belongs to the latest run,
+  // so a slow stale response can never overwrite a newer one.
+  const seqRef = useRef(0);
 
   async function run(text: string) {
-    if (!text.trim()) return;
+    if (!text.trim() || loading) return;
+    const seq = ++seqRef.current;
     setLoading(true);
     setData(null);
+    setError(null);
     try {
       const res = await fetch('/api/find', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ query: text }),
+        signal: AbortSignal.timeout(90_000),
       });
-      setData((await res.json()) as FinderResult);
+      if (seq !== seqRef.current) return;
+      if (!res.ok) {
+        setError(messageForStatus(res.status));
+        return;
+      }
+      const result = (await res.json()) as FinderResult;
+      if (seq !== seqRef.current) return;
+      setData(result);
+    } catch (err) {
+      if (seq !== seqRef.current) return;
+      if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+        setError('This one is taking too long, so we stopped waiting. Try again: searches usually finish much faster.');
+      } else {
+        setError("Couldn't reach the finder. Check your connection and try again.");
+      }
     } finally {
-      setLoading(false);
+      if (seq === seqRef.current) setLoading(false);
     }
   }
 
@@ -39,7 +67,7 @@ export function FinderPanel() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') run(query); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !loading) run(query); }}
           placeholder="Name a product, or describe the one you're picturing…"
           aria-label="Product name or description"
           className="w-full rounded-input border border-hairline bg-paper px-4 py-3 text-[15px] leading-relaxed text-ink outline-none transition-colors duration-editorial ease-editorial placeholder:text-ink-2 focus:border-ink-2"
@@ -66,6 +94,13 @@ export function FinderPanel() {
           </button>
         ))}
       </div>
+
+      {error && (
+        <div role="alert" className="mt-7 inline-flex items-center gap-2 rounded-pill bg-coral-tint px-3 py-1.5 text-[12px] text-coral-deep">
+          <span className="h-1.5 w-1.5 rounded-full bg-coral" aria-hidden="true" />
+          {error}
+        </div>
+      )}
 
       {data?.degraded && (
         <div className="mt-7 inline-flex items-center gap-2 rounded-pill bg-surface px-3 py-1.5 text-[12px] text-ink-2">

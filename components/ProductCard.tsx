@@ -31,20 +31,15 @@ export function ProductCard({ offer }: { offer: Offer }) {
           )}
           <div className="mt-1 text-[12px] text-ink-2">{offer.retailer}</div>
         </div>
-        {offer.price && (
-          <span className="shrink-0 rounded-pill bg-clay-tint px-2.5 py-1 font-mono text-[13px] font-medium text-clay-deep">
-            {offer.price}
-          </span>
-        )}
       </div>
 
       {offer.snippet && <p className="mt-3 text-[13px] leading-relaxed text-ink-2">{offer.snippet}</p>}
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-2 text-[12px] text-ink-2">
-        {offer.price && <span className="font-mono">captured price</span>}
-        {offer.price && captured && <span aria-hidden="true" className="text-hairline">·</span>}
-        {captured && <span className="font-mono">{captured}</span>}
-      </div>
+      {captured && (
+        <div className="mt-3 text-[12px] text-ink-2">
+          <span className="font-mono">{captured}</span>
+        </div>
+      )}
     </article>
   );
 }

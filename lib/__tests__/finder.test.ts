@@ -40,6 +40,12 @@ describe('retailerName', () => {
     expect(retailerName('https://apple.fanblog.com/post')).toBe('Fanblog'); // NOT "Apple"
     expect(retailerName('https://smile.amazon.com/dp/x')).toBe('Amazon');
   });
+  it('resolves common ccTLD retail domains to the brand', () => {
+    expect(retailerName('https://www.amazon.com.au/dp/x')).toBe('Amazon');
+    expect(retailerName('https://www.ebay.com.au/itm/1')).toBe('eBay');
+    expect(retailerName('https://www.amazon.co.jp/dp/x')).toBe('Amazon');
+    expect(retailerName('https://www.amazon.in/dp/x')).toBe('Amazon');
+  });
 });
 
 describe('cleanTitle', () => {
@@ -109,6 +115,13 @@ describe('extractOffers', () => {
     ];
     expect(extractOffers(dup, 'sony').filter((o) => o.retailer === 'Amazon')).toHaveLength(1);
   });
+  it('does not dedup distinct retailers sharing a ccTLD (amazon.com.au vs ebay.com.au)', () => {
+    const au: Citation[] = [
+      { rank: 1, title: 'Sony WH-1000XM5 - Amazon.com.au', canonicalUrl: 'https://www.amazon.com.au/dp/x', docId: 'au1', captureTime: 't', text: 'Add to cart. In stock.' },
+      { rank: 2, title: 'Sony WH-1000XM5 | eBay Australia', canonicalUrl: 'https://www.ebay.com.au/itm/1', docId: 'au2', captureTime: 't', text: 'Buy now. In stock.' },
+    ];
+    expect(extractOffers(au, 'sony wh-1000xm5').map((o) => o.retailer)).toEqual(['Amazon', 'eBay']);
+  });
 });
 
 describe('topMatch', () => {
@@ -177,6 +190,31 @@ describe('runFinder', () => {
     expect(out.topMatch).toContain('Vibram FiveFingers');
     expect(out.offers.map((o) => o.retailer)).toEqual(['Amazon', 'REI']);
     expect(out.degraded).toBe(false);
+  });
+  it('keeps stage-1 offers (not the demo) when the stage-2 retailer search fails', async () => {
+    const stage1: Citation[] = [
+      { rank: 1, title: 'Vibram FiveFingers KSO - Amazon.com', canonicalUrl: 'https://www.amazon.com/dp/v', docId: 's1', captureTime: 't', text: 'Add to cart. In stock.' },
+    ];
+    const searchAndRead = vi.fn()
+      .mockResolvedValueOnce({ evidence: 'x', citations: stage1 }) // stage 1: one real offer
+      .mockRejectedValueOnce(new Error('429'));                    // stage 2: rate limited
+    const out = await runFinder('running shoes with individual toe slots', { client: fakeClient({ searchAndRead }) });
+    expect(searchAndRead).toHaveBeenCalledTimes(2);
+    expect(out.degraded).toBe(false);
+    expect(out.topMatch).toContain('Vibram');
+    expect(out.offers.map((o) => o.retailer)).toEqual(['Amazon']);
+    expect(out.offers[0].productTitle).not.toContain('Sony'); // NOT the baked demo
+  });
+  it("VERIFIER_DEMO='0' does not force demo mode", async () => {
+    vi.stubEnv('VERIFIER_DEMO', '0');
+    try {
+      const searchAndRead = vi.fn().mockResolvedValue({ evidence: 'x', citations: productCites });
+      const out = await runFinder('sony wh-1000xm5', { client: fakeClient({ searchAndRead }) });
+      expect(searchAndRead).toHaveBeenCalledTimes(1); // demo mode would never hit the client
+      expect(out.degraded).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
   it('degrades to a demo result only when Caesar THROWS', async () => {
     const client = fakeClient({ searchAndRead: vi.fn().mockRejectedValue(new Error('429')) });

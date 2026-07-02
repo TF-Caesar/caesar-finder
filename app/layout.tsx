@@ -9,7 +9,7 @@ const geistMono = Geist_Mono({ subsets: ['latin'], weight: ['400', '500'], varia
 export const metadata: Metadata = {
   title: 'Caesar Finder — name it or describe it, find where to buy',
   description:
-    'Name a product or describe the one you are picturing. Caesar searches the live web and shows what it is and where to buy it, with the captured price and timestamp. Free, no signup. Powered by Caesar search.',
+    'Name a product or describe the one you are picturing. Caesar searches the live web, identifies the product, and lists live retailer listings with capture timestamps. Free, no signup. Powered by Caesar search.',
   icons: { icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }] },
 };
 
