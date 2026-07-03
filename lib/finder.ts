@@ -18,6 +18,21 @@ export interface FinderResult {
   degraded: boolean;
 }
 
+/**
+ * Live narration of the finder's agentic loop, for streaming UIs. Events
+ * mirror what runFinder is doing the moment it does it: 'offers' surfaces the
+ * stage-1 buy-gate output early (partial until confirmed), the 'identifying' /
+ * 'searching_retailers' statuses appear only when the two-stage path triggers,
+ * and 'done' always fires last carrying the exact FinderResult the call returns.
+ */
+export type FinderEvent =
+  | { type: 'status'; stage: 'searching'; query: string }
+  | { type: 'status'; stage: 'reading'; count: number }
+  | { type: 'status'; stage: 'identifying' }
+  | { type: 'status'; stage: 'searching_retailers'; product: string }
+  | { type: 'offers'; offers: Offer[]; partial: boolean }
+  | { type: 'done'; result: FinderResult };
+
 /** Friendly names for the retailers we see most; everything else is derived from the domain. */
 const RETAILERS: Record<string, string> = {
   amazon: 'Amazon', bestbuy: 'Best Buy', walmart: 'Walmart', target: 'Target', ebay: 'eBay',
@@ -249,37 +264,85 @@ function demoModeOn(): boolean {
   return ['1', 'true', 'yes', 'on'].includes((process.env.VERIFIER_DEMO ?? '').trim().toLowerCase());
 }
 
+const READ_TOP_N = 6;
+
+/**
+ * Overlay `search` on a client so the moment searchAndRead crosses from
+ * searching into reading we can emit a 'reading' status with the number of
+ * docs about to be read (replaying searchAndRead's own dedup + readTopN
+ * slice, since runFinder passes no minScore). A prototype overlay, not a
+ * wrapper class: every other method, including a caller-supplied
+ * searchAndRead, keeps its own behavior. lib/caesar.ts stays untouched.
+ */
+function withReadNarration(client: CaesarClient, emit: (e: FinderEvent) => void): CaesarClient {
+  const shim = Object.create(client) as CaesarClient;
+  shim.search = async (query, options = {}) => {
+    const res = await client.search(query, options);
+    const seen = new Set<string>();
+    const count = res.results.filter((r) => {
+      const k = r.docId ?? r.canonicalUrl;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    }).slice(0, READ_TOP_N).length;
+    if (count > 0) emit({ type: 'status', stage: 'reading', count });
+    return res;
+  };
+  return shim;
+}
+
 export async function runFinder(
   input: string,
-  deps: { client?: CaesarClient } = {},
+  deps: { client?: CaesarClient; onEvent?: (e: FinderEvent) => void } = {},
 ): Promise<FinderResult> {
   const query = input.trim();
-  if (demoModeOn()) return demoFinder(query);
-  const client = deps.client ?? new CaesarClient();
+  // Narration must never break the search: a throwing listener is the UI's bug,
+  // not a reason to lose the user's result.
+  const emit = (e: FinderEvent): void => {
+    try { deps.onEvent?.(e); } catch { /* swallowed by design */ }
+  };
+  const finish = (result: FinderResult): FinderResult => {
+    emit({ type: 'done', result });
+    return result;
+  };
+  if (demoModeOn()) {
+    const demo = demoFinder(query);
+    emit({ type: 'offers', offers: demo.offers, partial: false });
+    return finish(demo);
+  }
+  const base = deps.client ?? new CaesarClient();
+  const client = deps.onEvent ? withReadNarration(base, emit) : base;
+  emit({ type: 'status', stage: 'searching', query });
   try {
     // No minScore here: the buy-page gate below is the real junk filter, and a
     // score floor can wrongly empty results when Caesar omits scores under load.
-    const first = await client.searchAndRead(query, { maxResults: 10, readTopN: 6 });
+    const first = await client.searchAndRead(query, { maxResults: 10, readTopN: READ_TOP_N });
     const offers1 = extractOffers(first.citations, query);
+    // What the stage-1 buy-gate found, surfaced immediately; 'done' confirms or replaces it.
+    emit({ type: 'offers', offers: offers1, partial: true });
     // Named product: the query already surfaced retailers — done in one search.
     if (offers1.length >= 2) {
-      return { query, topMatch: topMatch(offers1), offers: offers1, degraded: false };
+      return finish({ query, topMatch: topMatch(offers1), offers: offers1, degraded: false });
     }
     // Description (or thin result): identify the product, then search retailers for it.
     const product = topMatch(offers1) ?? identifyProduct(first.citations, query);
     if (product) {
+      emit({ type: 'status', stage: 'identifying' });
+      emit({ type: 'status', stage: 'searching_retailers', product });
       // Stage 2 failing (rate limit, timeout) must not throw away stage 1's real
       // offers in favor of the baked demo — degrade to what we already have.
       try {
-        const second = await client.searchAndRead(product, { maxResults: 10, readTopN: 6 });
+        const second = await client.searchAndRead(product, { maxResults: 10, readTopN: READ_TOP_N });
         const offers2 = extractOffers(second.citations, product);
-        if (offers2.length > 0) return { query, topMatch: product, offers: offers2, degraded: false };
+        if (offers2.length > 0) return finish({ query, topMatch: product, offers: offers2, degraded: false });
       } catch { /* fall through to stage-1 offers */ }
-      return { query, topMatch: product, offers: offers1, degraded: false };
+      return finish({ query, topMatch: product, offers: offers1, degraded: false });
     }
-    return { query, topMatch: topMatch(offers1), offers: offers1, degraded: false };
+    return finish({ query, topMatch: topMatch(offers1), offers: offers1, degraded: false });
   } catch {
-    return demoFinder(query);
+    const demo = demoFinder(query);
+    emit({ type: 'offers', offers: demo.offers, partial: false });
+    return finish(demo);
   }
 }
 

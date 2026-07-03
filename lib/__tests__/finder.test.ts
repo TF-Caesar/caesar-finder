@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { parsePrice, retailerName, cleanTitle, extractOffers, topMatch, identifyProduct, runFinder } from '../finder';
-import type { Offer } from '../finder';
+import type { FinderEvent, Offer } from '../finder';
 import { CaesarClient } from '../caesar';
 import type { Citation } from '../caesar';
 
@@ -230,5 +230,86 @@ describe('runFinder', () => {
     expect(out.degraded).toBe(false);
     expect(out.offers).toHaveLength(0);
     expect(out.topMatch).toBeUndefined();
+  });
+});
+
+describe('runFinder events', () => {
+  function fakeClient(over: Partial<CaesarClient>): CaesarClient {
+    return Object.assign(Object.create(CaesarClient.prototype), over) as CaesarClient;
+  }
+  const tag = (e: FinderEvent) => (e.type === 'status' ? `status:${e.stage}` : e.type);
+
+  it('named product: searching, reading, partial offers, then done carrying the returned result', async () => {
+    // Mock search+read (not searchAndRead) so the real pipeline runs: the
+    // 'reading' event fires at the search-to-read boundary inside searchAndRead.
+    const search = vi.fn().mockResolvedValue({ results: [
+      { rank: 1, title: 'Sony WH-1000XM5 Wireless Headphones - Amazon.com', canonicalUrl: 'https://www.amazon.com/dp/x', docId: 'd1' },
+      { rank: 2, title: 'WH-1000XM5 | Best Buy', canonicalUrl: 'https://www.bestbuy.com/site/x', docId: 'd3' },
+    ] });
+    const read = vi.fn().mockImplementation(async (url: string) => ({
+      canonicalUrl: url, text: 'In stock. Add to cart for $348.00.', passages: [], captureTime: '2026-06-22T10:00:00Z',
+    }));
+    const events: FinderEvent[] = [];
+    const out = await runFinder('sony wh-1000xm5', { client: fakeClient({ search, read }), onEvent: (e) => events.push(e) });
+    expect(events.map(tag)).toEqual(['status:searching', 'status:reading', 'offers', 'done']);
+    expect((events[0] as Extract<FinderEvent, { stage: 'searching' }>).query).toBe('sony wh-1000xm5');
+    expect((events[1] as Extract<FinderEvent, { stage: 'reading' }>).count).toBe(2);
+    const partial = events[2] as Extract<FinderEvent, { type: 'offers' }>;
+    expect(partial.partial).toBe(true);
+    expect(partial.offers.map((o) => o.retailer)).toEqual(['Amazon', 'Best Buy']);
+    const done = events[3] as Extract<FinderEvent, { type: 'done' }>;
+    expect(done.result).toEqual(out);
+    expect(out.degraded).toBe(false);
+  });
+
+  it('two-stage: searching, partial offers, identifying, searching_retailers, done', async () => {
+    const retailerCites: Citation[] = [
+      { rank: 1, title: 'Vibram FiveFingers KSO - Amazon.com', canonicalUrl: 'https://www.amazon.com/dp/v', docId: 'r1', captureTime: 't', text: 'Add to cart. In stock.' },
+      { rank: 2, title: 'Vibram FiveFingers | REI Co-op', canonicalUrl: 'https://www.rei.com/product/vibram', docId: 'r2', captureTime: 't', text: 'In stock, add to cart.' },
+    ];
+    const searchAndRead = vi.fn()
+      .mockResolvedValueOnce({ evidence: 'x', citations: articleCites })   // stage 1: articles, no buy pages
+      .mockResolvedValueOnce({ evidence: 'x', citations: retailerCites }); // stage 2: retailers
+    const events: FinderEvent[] = [];
+    const out = await runFinder('running shoes with individual toe slots', { client: fakeClient({ searchAndRead }), onEvent: (e) => events.push(e) });
+    expect(events.map(tag)).toEqual(['status:searching', 'offers', 'status:identifying', 'status:searching_retailers', 'done']);
+    expect((events[1] as Extract<FinderEvent, { type: 'offers' }>).offers).toHaveLength(0); // stage-1 gate found no buy pages
+    expect((events[3] as Extract<FinderEvent, { stage: 'searching_retailers' }>).product).toContain('Vibram FiveFingers');
+    const done = events[4] as Extract<FinderEvent, { type: 'done' }>;
+    expect(done.result).toEqual(out);
+    expect(done.result.offers.map((o) => o.retailer)).toEqual(['Amazon', 'REI']);
+  });
+
+  it('stage-2 failure still emits done, carrying the stage-1 offers (never the demo)', async () => {
+    const stage1: Citation[] = [
+      { rank: 1, title: 'Vibram FiveFingers KSO - Amazon.com', canonicalUrl: 'https://www.amazon.com/dp/v', docId: 's1', captureTime: 't', text: 'Add to cart. In stock.' },
+    ];
+    const searchAndRead = vi.fn()
+      .mockResolvedValueOnce({ evidence: 'x', citations: stage1 }) // stage 1: one real offer
+      .mockRejectedValueOnce(new Error('429'));                    // stage 2: rate limited
+    const events: FinderEvent[] = [];
+    const out = await runFinder('running shoes with individual toe slots', { client: fakeClient({ searchAndRead }), onEvent: (e) => events.push(e) });
+    expect(events.map(tag)).toEqual(['status:searching', 'offers', 'status:identifying', 'status:searching_retailers', 'done']);
+    const done = events.at(-1) as Extract<FinderEvent, { type: 'done' }>;
+    expect(done.result).toEqual(out);
+    expect(done.result.degraded).toBe(false);
+    expect(done.result.offers.map((o) => o.retailer)).toEqual(['Amazon']);
+    expect(done.result.offers[0].productTitle).not.toContain('Sony'); // NOT the baked demo
+  });
+
+  it('demo fallback (Caesar throws) still ends the narration: offers, then done', async () => {
+    const client = fakeClient({ searchAndRead: vi.fn().mockRejectedValue(new Error('429')) });
+    const events: FinderEvent[] = [];
+    const out = await runFinder('headphones', { client, onEvent: (e) => events.push(e) });
+    expect(events.map(tag)).toEqual(['status:searching', 'offers', 'done']);
+    expect((events.at(-1) as Extract<FinderEvent, { type: 'done' }>).result).toEqual(out);
+    expect(out.degraded).toBe(true);
+  });
+
+  it('a throwing listener never breaks the search', async () => {
+    const searchAndRead = vi.fn().mockResolvedValue({ evidence: 'x', citations: productCites });
+    const out = await runFinder('sony wh-1000xm5', { client: fakeClient({ searchAndRead }), onEvent: () => { throw new Error('listener bug'); } });
+    expect(out.degraded).toBe(false);
+    expect(out.offers).toHaveLength(2);
   });
 });
