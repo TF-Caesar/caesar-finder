@@ -255,7 +255,8 @@ export function topMatch(offers: Offer[]): string | undefined {
 
 /**
  * Search the live web for a product (by name OR description), read the top
- * results, and return where-to-buy offers. Keyless by default. Only THROWS (and
+ * results, and return where-to-buy offers. Needs a Caesar API key on the
+ * server (the public API is keyed-only). Only THROWS (and
  * VERIFIER_DEMO) fall back to the baked demo; a search that simply found no
  * buyable product returns an honest empty result (degraded:false).
  */
@@ -346,7 +347,7 @@ export async function runFinder(
   }
 }
 
-/** Shown when the free tier is busy (and in VERIFIER_DEMO mode). */
+/** Shown when live search is unavailable (and in VERIFIER_DEMO mode). */
 function demoFinder(query: string): FinderResult {
   // Demo capture times are relative so the fallback never displays months-old
   // "freshness" — the offers are canned; pretending they were captured long ago

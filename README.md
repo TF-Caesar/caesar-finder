@@ -2,7 +2,7 @@
 
 Name a product, or **describe the one you're picturing**. Caesar searches the live web, reads the listings, and shows you **what it is and where to buy it** — each with **the moment that page was captured**, not a model's memory.
 
-Free. No signup. No API key. Powered by [Caesar](https://trycaesar.com) search.
+The hosted demo is free to use, no signup: the server holds the API key. Powered by [Caesar](https://trycaesar.com) search.
 
 ## Why this is different
 
@@ -11,19 +11,20 @@ Most "find me this product" tools either guess from a model's training data (sta
 - **Name it** (`Sony WH-1000XM5`) → a tidy list of where it's sold, each captured with a timestamp.
 - **Describe it** (`running shoes with individual toe slots`) → Caesar surfaces the matching product, leads with its best guess (**Looks like →**), then shows where to buy.
 
-## Run it locally (zero setup)
+## Run it locally
 
 ```bash
 git clone https://github.com/TF-Caesar/caesar-finder
 cd caesar-finder
 npm install
+cp .env.example .env.local   # then add your CAESAR_SEARCH_API_KEY
 npm run dev
 ```
 
-No keys required — it runs on Caesar's free anonymous tier. Optional env:
+Caesar's API is keyed: grab a key at [trycaesar.com](https://trycaesar.com) (new accounts include $1,000 in credits) and set it in `.env.local`:
 
-- `CAESAR_SEARCH_API_KEY` — higher rate limits.
-- `VERIFIER_DEMO=1` — force the cached demo response (offline showcase).
+- `CAESAR_SEARCH_API_KEY` (required): your Caesar API key.
+- `VERIFIER_DEMO=1` (optional): force the cached demo response (offline showcase).
 
 ## How it works
 

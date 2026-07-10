@@ -13,7 +13,7 @@ const EXAMPLES = [
 ];
 
 function messageForStatus(status: number): string {
-  if (status === 429) return 'The free tier allows a few searches per minute. Wait a moment, then try again.';
+  if (status === 429) return 'This demo allows a few searches per minute. Wait a moment, then try again.';
   if (status === 413) return 'That query is too large. Try a short product name or description.';
   if (status === 400) return "That didn't look like a searchable query. Try a product name or a short description.";
   return 'Something went wrong on our end. Try again in a moment.';
@@ -213,7 +213,7 @@ function FinderPanelInner() {
       {data?.degraded && (
         <div className="mt-7 inline-flex items-center gap-2 rounded-pill bg-surface px-3 py-1.5 text-[12px] text-ink-2">
           <span className="h-1.5 w-1.5 rounded-full bg-clay" aria-hidden="true" />
-          Showing a cached example — the free tier is busy right now.
+          Live search is unavailable right now, showing a cached example.
         </div>
       )}
 

@@ -1,6 +1,6 @@
 // Dependency-free in-memory rate limiter for the public demo API routes.
 //
-// One anonymous POST fans out to several Caesar searches and reads, so an
+// One visitor POST fans out to several Caesar searches and reads, so an
 // unthrottled loop can drain the shared quota and silently push every real
 // visitor onto the demo fallback. A small token bucket per client IP keeps the
 // demo honest and turns abuse into a clear 429 instead of degraded results.
