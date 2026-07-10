@@ -137,7 +137,10 @@ const BUY_TEXT = /add to (?:cart|bag|basket)|buy now|in stock|out of stock|add-t
 const ROUNDUP_TITLE = /\b(\d+\s+)?best\b|\breview(s)?\b|\bvs\.?\b|\bversus\b|\bbuying guide\b|\bguide\b|\bhow to\b|\bround[- ]?up\b|\bcompared\b/i;
 // Domains that are never "where to buy" — review, news, forum, and content sites.
 const NON_RETAIL = new Set([
-  'consumerreports', 'wirecutter', 'nytimes', 'rtings', 'cnet', 'techradar', 'tomsguide', 'theverge',
+  // cnn: CNN Underscored is a shopping-content section with prices and buy
+  // links, so it passes the buy-signal gate, but cnn.com is never the store
+  // (observed live: a "Cnn" retailer card for Sony headphones).
+  'consumerreports', 'wirecutter', 'nytimes', 'cnn', 'rtings', 'cnet', 'techradar', 'tomsguide', 'theverge',
   'reddit', 'youtube', 'wikipedia', 'pcmag', 'engadget', 'forbes', 'businessinsider', 'buzzfeed',
   'medium', 'quora', 'gizmodo', 'wired', 'digitaltrends', 'soundguys', 'whathifi', 'trustedreviews',
   'tripadvisor', 'yelp', 'pinterest', 'facebook', 'instagram', 'tiktok',
