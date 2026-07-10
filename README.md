@@ -30,6 +30,8 @@ Caesar's API is keyed: grab a key at [trycaesar.com](https://trycaesar.com) (new
 
 `search` the query → `read` the top results → for each **captured** page, derive the retailer (from the domain) and extract a one-line "what it is" — then list one offer per retailer in relevance order. The entire Caesar integration is one small, dependency-light file you can copy into your own project: [`lib/caesar.ts`](lib/caesar.ts).
 
+Describing a product (instead of naming it) adds a second stage: the finder works out the product name from what it read, then searches again for the name with retail-biased query rewrites. On that second search the index sees `<product> buy` (and `<product> price`), which tilts retrieval toward listings, while the name itself remains the query, so reranking and passage selection still follow the product.
+
 **Honest by design:** Caesar is a general web search/read API, not a shopping API. Only pages actually read become offers (no search-only phantoms), and we deliberately **don't show prices** — major retailers render them in JavaScript, so a web-search capture mostly catches accessory or payment-plan amounts, and a wrong price is worse than none. Click through to the retailer for the live price.
 
 ## License

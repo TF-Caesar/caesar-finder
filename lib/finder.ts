@@ -336,7 +336,14 @@ export async function runFinder(
       // Stage 2 failing (rate limit, timeout) must not throw away stage 1's real
       // offers in favor of the baked demo — degrade to what we already have.
       try {
-        const second = await client.searchAndRead(product, { maxResults: 10, readTopN: READ_TOP_N });
+        // search_queries: the FIRST rewrite replaces the text sent to the index
+        // (biasing retrieval toward retail listings); the bare product name stays
+        // the query, so reranking and passage selection still follow the product.
+        const second = await client.searchAndRead(product, {
+          maxResults: 10,
+          readTopN: READ_TOP_N,
+          searchQueries: [`${product} buy`, `${product} price`],
+        });
         const offers2 = extractOffers(second.citations, product);
         if (offers2.length > 0) return finish({ query, topMatch: product, offers: offers2, degraded: false });
       } catch { /* fall through to stage-1 offers */ }

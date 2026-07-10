@@ -191,6 +191,23 @@ describe('runFinder', () => {
     expect(out.offers.map((o) => o.retailer)).toEqual(['Amazon', 'REI']);
     expect(out.degraded).toBe(false);
   });
+  it('stage 2 sends retail-biased query rewrites; stage 1 sends none', async () => {
+    const retailerCites: Citation[] = [
+      { rank: 1, title: 'Vibram FiveFingers KSO - Amazon.com', canonicalUrl: 'https://www.amazon.com/dp/v', docId: 'r1', captureTime: 't', text: 'Add to cart. In stock.' },
+    ];
+    const searchAndRead = vi.fn()
+      .mockResolvedValueOnce({ evidence: 'x', citations: articleCites })   // stage 1: articles, no buy pages
+      .mockResolvedValueOnce({ evidence: 'x', citations: retailerCites }); // stage 2: retailers
+    await runFinder('running shoes with individual toe slots', { client: fakeClient({ searchAndRead }) });
+    // Stage 1 is the user's own words, unrewritten: there is no product name to bias toward yet.
+    expect(searchAndRead.mock.calls[0][0]).toBe('running shoes with individual toe slots');
+    expect(searchAndRead.mock.calls[0][1]).not.toHaveProperty('searchQueries');
+    // Stage 2: the index sees "<product> buy" / "<product> price" (retail-biased retrieval)
+    // while the bare product name stays the query, still driving reranking and passage selection.
+    const [product, opts] = searchAndRead.mock.calls[1];
+    expect(product).toContain('Vibram FiveFingers');
+    expect(opts.searchQueries).toEqual([`${product} buy`, `${product} price`]);
+  });
   it('keeps stage-1 offers (not the demo) when the stage-2 retailer search fails', async () => {
     const stage1: Citation[] = [
       { rank: 1, title: 'Vibram FiveFingers KSO - Amazon.com', canonicalUrl: 'https://www.amazon.com/dp/v', docId: 's1', captureTime: 't', text: 'Add to cart. In stock.' },
